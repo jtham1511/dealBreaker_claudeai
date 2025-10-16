@@ -334,6 +334,17 @@
             border: 1px solid var(--border);
         }
 
+        .ai-response-block {
+            margin: 0.75rem 0;
+        }
+
+        .ai-response-block > strong:first-child {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.35rem;
+            color: var(--text);
+        }
+
         .insight-card {
             border-left: 4px solid var(--primary);
             background: var(--surface);
@@ -1505,6 +1516,29 @@
             return messageDiv;
         }
 
+        // New function to format bot responses
+        function formatBotResponse(text) {
+            if (!text) return '';
+
+            const normalized = text
+                .replace(/\r\n/g, '\n')
+                .replace(/\r/g, '\n');
+
+            const sections = normalized
+                .split(/\n\s*\n/)
+                .map(section => section.trim())
+                .filter(Boolean);
+
+            return sections.map(section => {
+                const htmlSection = section
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\n/g, '<br>')
+                    .replace(/(<br>){3,}/g, '<br><br>');
+
+                return `<div class="ai-response-block">${htmlSection}</div>`;
+            }).join('');
+        }
+
         function generateAIResponse(question) {
             // In a real application, this is where you would make an API call
             // to a service like GitHub Copilot, OpenAI, or another AI provider.
@@ -1838,7 +1872,6 @@
   function renderHistory(){
     aiBody.innerHTML = '';
     const hist = loadHistory();
-//    hist.forEach(m => addMsg(escapeHtml(m.content), m.role === 'user'));
     hist.forEach(m => {
         if(m.role === 'user'){
             addMsg(escapeHtml(m.content), true);
@@ -1916,7 +1949,6 @@
             const json = JSON.parse(data);
             const token = json.delta || json.content || '';
             acc += token;
-//            holder.insertAdjacentHTML('beforeend', escapeHtml(token));
             holder.innerHTML = formatAssistant(acc);
             aiBody.scrollTop = aiBody.scrollHeight;
           } catch(e) {}
@@ -1933,22 +1965,31 @@
     return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   }
 
-  function formatAssistant(s){
-    if(!s) return '';
+  function formatAssistant(text){
+    if(!text) return '';
 
-    // simple markdown formatting: code blocks, inline code, bold, italics, links
-    let html = escapeHtml(s);
-    // code blocks ```
-    html = html.replace(/```([\s\S]*?)```/g, (m,p) => `<pre style="background:#f3f4f6;padding:10px;border-radius:6px;overflow:auto;"><code>${p.trim()}</code></pre>`);
-    // inline code `
-    html = html.replace(/`([^`\n]+)`/g, (m,p) => `<code style="background:#f3f4f6;padding:2px 4px;border-radius:4px;">${p}</code>`);
-    // bold **
-    html = html.replace(/\*\*([^*]+)\*\*/g, (m,p) => `<strong>${p}</strong>`);
-    // italics *
-    html = html.replace(/\*([^*]+)\*/g, (m,p) => `<em>${p}</em>`);
-    // links [text](url)
-    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (m,p1,p2) => `<a href="${p2}" target="_blank" rel="noopener">${p1}</a>`);
-    return html;
+    const placeholders = [];
+    let working = text.replace(/<\/?strong>/gi, tag => {
+      const token = `__TAG_${placeholders.length}__`;
+      placeholders.push(tag.toLowerCase());
+      return token;
+    });
+
+    working = working
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\"/g, '&quot;');
+
+    working = working.replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>');
+    working = working.replace(/\r\n|\r|\n/g, '<br>');
+
+    placeholders.forEach((tag, idx) => {
+      const token = `__TAG_${idx}__`;
+      working = working.split(token).join(tag);
+    });
+
+    return working;
   }
 
   aiSend.addEventListener('click', send);

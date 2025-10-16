@@ -88,24 +88,7 @@ export default async function handler(req, res) {
     const decoder = new TextDecoder('utf-8');
 
     let buffer = '';
-    let formatBuffer = '';
-    let boldOpen = false;
 
-    const formatToken = (text) => {
-      formatBuffer += text;
-      let output = '';
-      while (true) {
-        const idx = formatBuffer.indexOf('**');
-        if (idx === -1) break;
-        output += formatBuffer.slice(0, idx);
-        formatBuffer = formatBuffer.slice(idx + 2);
-        output += boldOpen ? '</strong>' : '<strong>';
-        boldOpen = !boldOpen;
-      }
-      output += formatBuffer;
-      formatBuffer = '';
-      return output;
-    };
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
@@ -124,21 +107,12 @@ export default async function handler(req, res) {
           try {
             const json = JSON.parse(payload);
             const token = json.choices?.[0]?.delta?.content || '';
-//            if (token) res.write(`data: ${JSON.stringify({ delta: token })}\n\n`);
-            if (token) {
-              const normalizedToken = token.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-              const formattedToken = formatToken(normalizedToken);
-              if (formattedToken) {
-                res.write(`data: ${JSON.stringify({ delta: formattedToken })}\n\n`);
-              }
+            if (token) res.write(`data: ${JSON.stringify({ delta: token })}\n\n`);
             }
           } catch {}
         }
       }
       buffer = lines[lines.length - 1];
-    }
-    if (boldOpen) {
-      res.write(`data: ${JSON.stringify({ delta: '</strong>' })}\n\n`);
     }
     res.write(`data: [DONE]\n\n`);
     res.end();
