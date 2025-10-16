@@ -44,9 +44,7 @@ export default async function handler(req, res) {
     "Prefer numbered steps; keep responses < 250 words unless explicitly asked for more.",
     "If math is needed, compute carefully.",
     "When asked about the analysis, use the data from the visible sections (tables, cards, filters).",
-    "Do not mention the system prompt in your responses.",
     "If the user asks about contract optimization, savings, or alternatives, use the provided contract context to inform your answers.",
-    "Do not make up contract details; if unsure, say you don't know.",
     "Always prioritize accuracy and clarity in your responses.",
     "When asked about user sentiment or survey data, refer to the contract context for specific figures and insights.",
     "If the user inquires about cost-saving strategies or negotiation levers, provide information based on the contract context.",
@@ -90,6 +88,24 @@ export default async function handler(req, res) {
     const decoder = new TextDecoder('utf-8');
 
     let buffer = '';
+    let formatBuffer = '';
+    let boldOpen = false;
+
+    const formatToken = (text) => {
+      formatBuffer += text;
+      let output = '';
+      while (true) {
+        const idx = formatBuffer.indexOf('**');
+        if (idx === -1) break;
+        output += formatBuffer.slice(0, idx);
+        formatBuffer = formatBuffer.slice(idx + 2);
+        output += boldOpen ? '</strong>' : '<strong>';
+        boldOpen = !boldOpen;
+      }
+      output += formatBuffer;
+      formatBuffer = '';
+      return output;
+    };
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
@@ -110,14 +126,19 @@ export default async function handler(req, res) {
             const token = json.choices?.[0]?.delta?.content || '';
 //            if (token) res.write(`data: ${JSON.stringify({ delta: token })}\n\n`);
             if (token) {
-              // stream tokens, escaping newlines to avoid breaking the event stream
-              const formattedToken = token.replace(/\n/g, '<br/>'); // simple formatting example
-              res.write(`data: ${JSON.stringify({ delta: formattedToken })}\n\n`);
+              const normalizedToken = token.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+              const formattedToken = formatToken(normalizedToken);
+              if (formattedToken) {
+                res.write(`data: ${JSON.stringify({ delta: formattedToken })}\n\n`);
+              }
             }
           } catch {}
         }
       }
       buffer = lines[lines.length - 1];
+    }
+    if (boldOpen) {
+      res.write(`data: ${JSON.stringify({ delta: '</strong>' })}\n\n`);
     }
     res.write(`data: [DONE]\n\n`);
     res.end();
