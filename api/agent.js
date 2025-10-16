@@ -108,7 +108,12 @@ export default async function handler(req, res) {
           try {
             const json = JSON.parse(payload);
             const token = json.choices?.[0]?.delta?.content || '';
-            if (token) res.write(`data: ${JSON.stringify({ delta: token })}\n\n`);
+//            if (token) res.write(`data: ${JSON.stringify({ delta: token })}\n\n`);
+            if (token) {
+              // stream tokens, escaping newlines to avoid breaking the event stream
+              const formattedToken = token.replace(/\n/g, '<br/>'); // simple formatting example
+              res.write(`data: ${JSON.stringify({ delta: formattedToken })}\n\n`);
+            }
           } catch {}
         }
       }
