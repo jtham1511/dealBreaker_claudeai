@@ -1797,10 +1797,10 @@
   .ai-small { font-size:12px; color:#6b7280; }
   .ai-kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; padding:2px 6px; border:1px solid #e5e7eb; border-radius:6px; background:#f8fafc; }
 </style>
-<div class="ai-fab" id="aiFab" aria-label="Open AI assistant">AI</div>
+<div class="ai-fab" id="aiFab" aria-label="Open AI assistant">ai</div>
 <div class="ai-modal" id="aiModal" role="dialog" aria-modal="true" aria-label="AI assistant">
   <div class="ai-head">
-    <span>AI Assistant</span>
+    <span>dealBreaker AI Assistant</span>
     <div class="ai-small">Press <span class="ai-kbd">Esc</span> to close</div>
   </div>
   <div class="ai-body" id="aiBody"></div>
@@ -1838,7 +1838,14 @@
   function renderHistory(){
     aiBody.innerHTML = '';
     const hist = loadHistory();
-    hist.forEach(m => addMsg(escapeHtml(m.content), m.role === 'user'));
+//    hist.forEach(m => addMsg(escapeHtml(m.content), m.role === 'user'));
+    hist.forEach(m => {
+        if(m.role === 'user'){
+            addMsg(escapeHtml(m.content), true);
+        } else {
+            addMsg(formatAssistant(m.content), false);
+        }
+    });
     aiBody.scrollTop = aiBody.scrollHeight;
   }
 
@@ -1909,7 +1916,8 @@
             const json = JSON.parse(data);
             const token = json.delta || json.content || '';
             acc += token;
-            holder.insertAdjacentHTML('beforeend', escapeHtml(token));
+//            holder.insertAdjacentHTML('beforeend', escapeHtml(token));
+            holder.innerHTML = formatAssistant(acc);
             aiBody.scrollTop = aiBody.scrollHeight;
           } catch(e) {}
         }
@@ -1923,6 +1931,24 @@
 
   function escapeHtml(s){
     return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  }
+
+  function formatAssistant(s){
+    if(!s) return '';
+
+    // simple markdown formatting: code blocks, inline code, bold, italics, links
+    let html = escapeHtml(s);
+    // code blocks ```
+    html = html.replace(/```([\s\S]*?)```/g, (m,p) => `<pre style="background:#f3f4f6;padding:10px;border-radius:6px;overflow:auto;"><code>${p.trim()}</code></pre>`);
+    // inline code `
+    html = html.replace(/`([^`\n]+)`/g, (m,p) => `<code style="background:#f3f4f6;padding:2px 4px;border-radius:4px;">${p}</code>`);
+    // bold **
+    html = html.replace(/\*\*([^*]+)\*\*/g, (m,p) => `<strong>${p}</strong>`);
+    // italics *
+    html = html.replace(/\*([^*]+)\*/g, (m,p) => `<em>${p}</em>`);
+    // links [text](url)
+    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (m,p1,p2) => `<a href="${p2}" target="_blank" rel="noopener">${p1}</a>`);
+    return html;
   }
 
   aiSend.addEventListener('click', send);
